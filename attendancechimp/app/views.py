@@ -22,6 +22,9 @@ import io
 
 CDT = zoneinfo.ZoneInfo("America/Chicago")
 
+def view_time(request):
+	now = datetime.now(CDT)
+	return HttpResponse(now.strftime("%H:%M"), content_type="text/plain")
 
 # ---------------------------------------------------------------------------
 # HW2  — index, time, sum
@@ -53,3 +56,31 @@ def index(request):
 
 
 
+
+
+# ---------------------------------------------------------------------------
+# HW2 endpoints: time and sum
+# ---------------------------------------------------------------------------
+
+def time_view(request):
+    """Return the current Central time as plain text, formatted HH:MM."""
+    now = datetime.now(CDT)
+    return HttpResponse(now.strftime("%H:%M"), content_type="text/plain")
+
+
+def _to_number(value):
+    """Convert a string to int if it's a whole number, otherwise float."""
+    try:
+        return int(value)
+    except ValueError:
+        return float(value)
+
+
+def sum_view(request):
+    """Return {"sum": n1 + n2} as JSON, reading n1 and n2 from the query string."""
+    try:
+        n1 = _to_number(request.GET.get("n1"))
+        n2 = _to_number(request.GET.get("n2"))
+    except (TypeError, ValueError):
+        return HttpResponseBadRequest("n1 and n2 must be numbers")
+    return JsonResponse({"sum": n1 + n2})
