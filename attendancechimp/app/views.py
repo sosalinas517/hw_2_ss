@@ -83,4 +83,4 @@ def sum_view(request):
         n2 = _to_number(request.GET.get("n2"))
     except (TypeError, ValueError):
         return HttpResponseBadRequest("n1 and n2 must be numbers")
-    return JsonResponse({"sum": n1 + n2})
+    return HttpResponse(f"<p>{"sum": n1 + n2}</p>")
