@@ -1,0 +1,19 @@
+llm-comparison.txt
+
+Asked: 
+Generate a Django models.py file for an attendance tracking application using these specifications
+
+Specifications provided:
+Separate InstructorProfile and StudentProfile models.
+A Course model with a name, instructor, and meeting schedule.
+An Enrollment model linking students and courses through a many-to-many relationship.
+A Lecture model linked to a course, with a date and unique QR identifier.
+A QRCodeUpload model linked to a student and optionally to a lecture.
+
+
+When comparing my model and the one created by ChatGPT, it was obvious just from a 
+glance that my model is much simpler. The ChatGPT model created an extra class for 
+Enrollment called "Meta". ChatGPT also added a string method to every model class, 
+which did make me realize that I probably should have added those to my model as well. 
+The ChatGPT model also labeled the user_ids as just user or uuid, which I think makes
+it a bit difficult to differenciate which type of id labels what. 
