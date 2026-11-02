@@ -11,6 +11,9 @@ from django.http import (HttpResponse, HttpResponseForbidden,
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login
+from django.views.decorators.http import require_GET, require_POST
+from django.db import transaction, IntegrityError
+from .models import StudentProfile, InstructorProfile
 from datetime import datetime
 import zoneinfo
 import json
@@ -32,8 +35,12 @@ def view_time(request):
 
 def index(request):
     """Render the home page (index.html)."""
-
-    context = {}
+    now = datetime.now(CDT)
+    username = request.user.username if request.user.is_authenticated else None
+    context = {
+        "current_time": now.strftime("%H:%M"),
+        "username": username,
+    }
     return render(request, 'app/index.html', context)
 
 
@@ -41,9 +48,47 @@ def index(request):
 # ---------------------------------------------------------------------------
 # HW4  — user creation
 # ---------------------------------------------------------------------------
+@require_GET
+def new(request):
+    """Render the sign-up form (GET only)."""
+    return render(request, 'app/new.html', {})
 
 
+@csrf_exempt
+@require_POST
+def createUser(request):
+    """Create a User and a student/instructor profile, then sign them in."""
+    email = request.POST.get('email', '').strip()
+    user_name = request.POST.get('user_name', '').strip()
+    password = request.POST.get('password', '')
+    is_student_raw = request.POST.get('is_student', '')
 
+    if not (email and user_name and password and is_student_raw):
+        return HttpResponseBadRequest("Missing required field")
+
+    is_student = is_student_raw.strip().lower() in ('1', 'true', 'yes', 'on')
+
+    if User.objects.filter(email__iexact=email).exists():
+        return HttpResponse("A user with that email already exists", status=409)
+
+    try:
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=user_name, email=email, password=password
+            )
+            if is_student:
+                StudentProfile.objects.create(user=user)
+            else:
+                InstructorProfile.objects.create(user=user)
+    except IntegrityError:
+        return HttpResponse("That user name is already taken", status=409)
+
+    user = authenticate(request, username=user_name, password=password)
+    if user is not None:
+        login(request, user)
+
+    return HttpResponse("User created and signed in") 
+    
 # ---------------------------------------------------------------------------
 # HW5  — courses, lectures, QR uploads, dump
 # ---------------------------------------------------------------------------
