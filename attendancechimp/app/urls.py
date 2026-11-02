@@ -6,6 +6,7 @@ urlpatterns = [
     path('time', views.time_view, name='time'),
     path('sum', views.sum_view, name='sum'),
     path('new', views.new, name='new'),
-    path('createUser', views.createUser, name='createUser')
+    path('createUser', views.createUser, name='createUser'),
+    path('index.html', views.index, name='index_html')
 ]
 
