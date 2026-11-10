@@ -83,7 +83,7 @@ class QRCodeUpload(models.Model):
     upload_id = models.AutoField(primary_key=True)
     student_id = models.ForeignKey(StudentProfile, on_delete=models.CASCADE)
     lecture_id = models.ForeignKey(Lecture, null=True, on_delete=models.SET_NULL)
-    image = models.ImageField(upload_to="qr_uploads/")
+    image = models.FileField(upload_to="qr_uploads/")
     qr_identifier = models.CharField(max_length=150, null = False)
     uploaded_at = models.DateTimeField(auto_now_add=True, null = False)
 
@@ -93,15 +93,15 @@ class QRCodeUpload(models.Model):
 # ---------------------------------------------------------------------------
 def get_enrolled_students(course):
     """Return all students enrolled in the given course."""
-    return StudentProfile.objects.filter(enrollment__course = course)
+    return StudentProfile.objects.filter(enrollment__course_id=course)
 
 def instructor_courses(instructor):
     """Returns all courses an instructor teaches"""
-    return InstructorProfile.objects.filter(instructor = instructor)
+    return Course.objects.filter(instructor_id=instructor)
 
 def get_lecture_attendees(lecture):
     """Return all students who uploaded a QR code for the given lecture."""
-    return StudentProfile.objects.filter(qrcodeupload__lecture = lecture).distinct()
+    return StudentProfile.objects.filter(qrcodeupload__lecture_id = lecture).distinct()
 
 
 

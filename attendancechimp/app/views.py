@@ -7,21 +7,28 @@ interact with the database via models.py, and return an HTTP response.
 
 from django.shortcuts import render, redirect
 from django.http import (HttpResponse, HttpResponseForbidden,
-                         HttpResponseBadRequest, JsonResponse)
+                        HttpResponseBadRequest, JsonResponse)
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login
 from django.views.decorators.http import require_GET, require_POST
 from django.db import transaction, IntegrityError
-from .models import StudentProfile, InstructorProfile
+from .models import Course, Lecture, QRCodeUpload, StudentProfile, InstructorProfile
 from datetime import datetime
 import zoneinfo
 import json
 import io
+import random
+import string
 
 # from .models import (InstructorProfile, StudentProfile, Course, Enrollment,
 #                      Lecture, QRCodeUpload, is_instructor, is_student,
 #                      getUploadsForCourse)
+def is_instructor(user):
+    return user.is_authenticated and hasattr(user, "instructorprofile")
+
+def is_student(user):
+    return user.is_authenticated and hasattr(user, "studentprofile")
 
 CDT = zoneinfo.ZoneInfo("America/Chicago")
 
@@ -92,8 +99,87 @@ def createUser(request):
 # ---------------------------------------------------------------------------
 # HW5  — courses, lectures, QR uploads, dump
 # ---------------------------------------------------------------------------
+@csrf_exempt
+def createCourse(request):
+    if not is_instructor(request.user):
+        return HttpResponse(status=401)
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
+    day_keys = [("day-mon", "Mon"), ("day-tue", "Tue"), ("day-wed", "Wed"),
+                ("day-thu", "Thu"), ("day-fri", "Fri")]
+    days = [label for key, label in day_keys if key in request.POST]
+    if not days:
+        return HttpResponseBadRequest("Select at least one day")
+
+    name = request.POST["course-name"]
+    if Course.objects.filter(course_name=name).exists():
+        return HttpResponse("Course name already exists", status=409)
+
+    schedule = (f"{','.join(days)} "
+                f"{request.POST['start-time']}-{request.POST['end-time']}")
+    Course.objects.create(
+        course_name=name,
+        instructor_id=request.user.instructorprofile,
+        meeting_schedule=schedule,
+    )
+    return HttpResponse(status=200)
 
 
+@csrf_exempt
+def createLecture(request):
+    if not is_instructor(request.user):
+        return HttpResponse(status=401)
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
+    try:
+        course = Course.objects.get(course_name=request.POST.get("choice"))
+    except Course.DoesNotExist:
+        return HttpResponseBadRequest("No such course")
+
+    Lecture.objects.create(
+        course_id=course,
+        lecture_date=datetime.now(CDT).date(),
+        qr_identifier="".join(random.choices(string.ascii_letters + string.digits, k=20)),
+    )
+    return HttpResponse(status=200)
+
+
+@csrf_exempt
+def createQRCodeUpload(request):
+    if not is_student(request.user):
+        return HttpResponse(status=401)
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
+    image = request.FILES.get("imageUpload")
+    if image is None:
+        return HttpResponseBadRequest("Missing imageUpload")
+
+    QRCodeUpload.objects.create(
+        student_id=request.user.studentprofile,
+        image=image,
+        qr_identifier="",   # not decoded in HW5; uploaded_at fills itself in
+    )
+    return HttpResponse(status=200)
+
+
+def dumpUploads(request):
+    if not is_instructor(request.user):
+        return HttpResponse(status=401)
+    if request.method != "GET":
+        return HttpResponse(status=405)
+
+    uploads = QRCodeUpload.objects.select_related("student_id__user")
+    data = [
+        {
+            "username": u.student_id.user.username,
+            "upload_time": u.uploaded_at.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        for u in uploads
+    ]
+    return JsonResponse(data, safe=False)
 
 # ---------------------------------------------------------------------------
 # HW6  — getUploads
@@ -129,3 +215,13 @@ def sum_view(request):
     except (TypeError, ValueError):
         return HttpResponseBadRequest("n1 and n2 must be numbers")
     return HttpResponse(f"<p>{n1 + n2}</p>")
+
+def new_course(request):
+    return render(request, "app/new_course.html")
+
+def new_lecture(request):
+    courses = Course.objects.all()
+    return render(request, "app/new_lecture.html", {"courses": courses})
+
+def new_qr_upload(request):
+    return render(request, "app/new_qr_upload.html")
