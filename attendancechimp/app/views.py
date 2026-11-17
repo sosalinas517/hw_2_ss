@@ -185,7 +185,7 @@ def dumpUploads(request):
 # ---------------------------------------------------------------------------
 # HW6  — getUploads
 # ---------------------------------------------------------------------------
-def getUploads(request, course_id):
+def getUploadsForCourse(request, course_id):
     if not is_instructor(request.user):
         return HttpResponse(status=401)
     if request.method != "GET":
