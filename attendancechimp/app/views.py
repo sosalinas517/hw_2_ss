@@ -13,7 +13,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login
 from django.views.decorators.http import require_GET, require_POST
 from django.db import transaction, IntegrityError
-from django.http import JsonReponse
+from django.http import JsonResponse
 from .models import Course, Lecture, QRCodeUpload, StudentProfile, InstructorProfile
 from datetime import datetime
 import zoneinfo
