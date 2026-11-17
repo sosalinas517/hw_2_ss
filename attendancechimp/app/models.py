@@ -87,6 +87,10 @@ class QRCodeUpload(models.Model):
     qr_identifier = models.CharField(max_length=150, null = False)
     uploaded_at = models.DateTimeField(auto_now_add=True, null = False)
 
+def getUploadsForCourse(course):
+    """Return all QR code uploads for a given course."""
+    return QRCodeUpload.objects.filter(lecture_id__course_id=course).select_related('student_id', 'lecture_id')
+
 
 # ---------------------------------------------------------------------------
 # Helper / API functions

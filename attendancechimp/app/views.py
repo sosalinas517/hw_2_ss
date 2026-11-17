@@ -13,6 +13,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login
 from django.views.decorators.http import require_GET, require_POST
 from django.db import transaction, IntegrityError
+from django.http import JsonReponse
 from .models import Course, Lecture, QRCodeUpload, StudentProfile, InstructorProfile
 from datetime import datetime
 import zoneinfo
@@ -184,9 +185,28 @@ def dumpUploads(request):
 # ---------------------------------------------------------------------------
 # HW6  — getUploads
 # ---------------------------------------------------------------------------
+def getUploads(request, course_id):
+    if not is_instructor(request.user):
+        return HttpResponse(status=401)
+    if request.method != "GET":
+        return HttpResponse(status=405)
 
+    try:
+        course = Course.objects.get(course_id=course_id)
+    except Course.DoesNotExist:
+        return HttpResponseBadRequest("No such course")
 
-
+    uploads = QRCodeUpload.objects.filter(lecture_id__course_id=course).select_related('student_id', 'lecture_id')
+    obj = [
+        {
+            "username": u.student_id.user.username,
+            "upload_time": u.uploaded_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "lecture_date": u.lecture_id.lecture_date.strftime("%Y-%m-%d") if u.lecture_id else None,
+            "qr_identifier": u.qr_identifier,
+        }
+        for u in uploads
+    ]
+    return JsonResponse(obj, safe=False)
 
 
 # ---------------------------------------------------------------------------
