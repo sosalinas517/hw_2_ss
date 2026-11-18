@@ -15,7 +15,7 @@ from django.views.decorators.http import require_GET, require_POST
 from django.db import transaction, IntegrityError
 from django.http import JsonResponse
 from .models import Course, Lecture, QRCodeUpload, StudentProfile, InstructorProfile
-from datetime import datetime
+from datetime import datetime as dt
 import zoneinfo
 import json
 import io
@@ -120,11 +120,16 @@ def createCourse(request):
     schedule = (f"{','.join(days)} "
                 f"{request.POST['start-time']}-{request.POST['end-time']}")
     Course.objects.create(
-        course_name=name,
-        instructor_id=request.user.instructorprofile,
-        meeting_schedule=schedule,
-    )
-    return HttpResponse(status=200)
+    course_name=name,
+    instructor_id=request.user.instructorprofile,
+    mon="day-mon" in request.POST,
+    tue="day-tue" in request.POST,
+    wed="day-wed" in request.POST,
+    thu="day-thu" in request.POST,
+    fri="day-fri" in request.POST,
+    start_time=dt.strptime(request.POST["start-time"], "%H:%M").time(),
+    end_time=dt.strptime(request.POST["end-time"], "%H:%M").time(),
+)
 
 
 @csrf_exempt
@@ -185,24 +190,26 @@ def dumpUploads(request):
 # ---------------------------------------------------------------------------
 # HW6  — getUploads
 # ---------------------------------------------------------------------------
-def getUploadsForCourse(request):
-    # 401 for logged-out users and for students
-    if not request.user.is_authenticated or not InstructorProfile.objects.filter(user=request.user).exists():
+from .models import getUploadsForCourse
+
+def getUploads(request):
+    if not is_instructor(request.user):
         return JsonResponse({"error": "Unauthorized"}, status=401)
+    if request.method != "GET":
+        return HttpResponse(status=405)
 
     course = request.GET.get("course")
     if not course:
         return JsonResponse({"error": "Missing course parameter"}, status=400)
 
-    uploads = getUploadsForCourse(course)  # [] for unknown course -> 200 with []
     data = [
         {
             "username": u.student_id.user.username,
-            "upload_time": u.uploaded_at.isoformat(),
+            "upload_time": u.uploaded_at.strftime("%Y-%m-%d %H:%M:%S"),
         }
-        for u in uploads
+        for u in getUploadsForCourse(course)
     ]
-    return JsonResponse(data, safe=False) 
+    return JsonResponse(data, safe=False)
 
 
 # ---------------------------------------------------------------------------

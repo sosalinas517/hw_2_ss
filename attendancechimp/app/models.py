@@ -22,6 +22,9 @@ from django.contrib.auth.models import User
 import logging
 import string
 import random
+import re
+from zoneinfo import ZoneInfo
+from django.utils import timezone
 
 logger = logging.getLogger(__name__) # set up tracking, auditing, and debugging
                                                             # allows using logger.warning(), logger.error(), 
@@ -48,11 +51,19 @@ class StudentProfile(models.Model):
 # Course
 # ---------------------------------------------------------------------------
 class Course(models.Model):
-    """A course taught by a singular instructor with a recurring meeting schedule."""
-    course_id = models.AutoField(null = False, primary_key=True)
-    course_name = models.CharField(max_length=200, null = False)
-    instructor_id = models.ForeignKey(InstructorProfile, on_delete = models.CASCADE, related_name="courses")
-    meeting_schedule = models.CharField(max_length = 200, null= False)
+    course_id = models.AutoField(primary_key=True)
+    course_name = models.CharField(max_length=200)
+    instructor_id = models.ForeignKey(InstructorProfile, on_delete=models.CASCADE, related_name="courses")
+    mon = models.BooleanField(default=False)
+    tue = models.BooleanField(default=False)
+    wed = models.BooleanField(default=False)
+    thu = models.BooleanField(default=False)
+    fri = models.BooleanField(default=False)
+    start_time = models.TimeField(default="00:00")
+    end_time = models.TimeField(default="23:59")
+
+    def meets_on_day(self, weekday):
+        return weekday < 5 and [self.mon, self.tue, self.wed, self.thu, self.fri][weekday]
 # ---------------------------------------------------------------------------
 # Enrollment
 # ---------------------------------------------------------------------------
@@ -85,19 +96,22 @@ class QRCodeUpload(models.Model):
     lecture_id = models.ForeignKey(Lecture, null=True, on_delete=models.SET_NULL)
     image = models.FileField(upload_to="qr_uploads/")
     qr_identifier = models.CharField(max_length=150, null = False)
-    uploaded_at = models.DateTimeField(auto_now_add=True, null = False)
+    uploaded_at = models.DateTimeField(auto_now_add=True, null = False) 
 
 def getUploadsForCourse(course):
-    """Return QR uploads for a course (by name) made during its meeting times."""
-    uploads = (
-        QRCodeUpload.objects
-        .filter(lecture_id__course_id__course_name=course)
-        .select_related('student_id', 'lecture_id', 'lecture_id__course_id')
-    )
-    return [
-        u for u in uploads
-        if _during_meeting(u.uploaded_at, u.lecture_id.course_id.meeting_schedule)
-    ]
+    if not Course.objects.filter(course_name=course).exists():
+        return []
+    uploads = QRCodeUpload.objects.filter(
+        lecture_id__course_id__course_name=course
+    ).select_related("student_id__user", "lecture_id__course_id")
+
+    result = []
+    for u in uploads:
+        c = u.lecture_id.course_id
+        local = timezone.localtime(u.uploaded_at, ZoneInfo("America/Chicago"))
+        if c.meets_on_day(local.weekday()) and c.start_time <= local.time() <= c.end_time:
+            result.append(u)
+    return result
 
 # ---------------------------------------------------------------------------
 # Helper / API functions
