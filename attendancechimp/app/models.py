@@ -88,8 +88,12 @@ class QRCodeUpload(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True, null = False)
 
 def getUploadsForCourse(course):
-    """Return all QR code uploads for a given course."""
-    return QRCodeUpload.objects.filter(lecture_id__course_id=course).select_related('student_id', 'lecture_id')
+    """Return all QR code uploads for a given course (by course name)."""
+    return list(
+        QRCodeUpload.objects
+        .filter(lecture_id__course_id__course_name=course)
+        .select_related('student_id', 'lecture_id')
+    )
 
 
 # ---------------------------------------------------------------------------
