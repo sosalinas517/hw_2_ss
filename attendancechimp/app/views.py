@@ -185,28 +185,24 @@ def dumpUploads(request):
 # ---------------------------------------------------------------------------
 # HW6  — getUploads
 # ---------------------------------------------------------------------------
-def getUploadsForCourse(request, course_id):
-    if not is_instructor(request.user):
-        return HttpResponse(status=401)
-    if request.method != "GET":
-        return HttpResponse(status=405)
+def getUploadsForCourse(request):
+    # 401 for logged-out users and for students
+    if not request.user.is_authenticated or not InstructorProfile.objects.filter(user=request.user).exists():
+        return JsonResponse({"error": "Unauthorized"}, status=401)
 
-    try:
-        course = Course.objects.get(course_id=course_id)
-    except Course.DoesNotExist:
-        return HttpResponseBadRequest("No such course")
+    course = request.GET.get("course")
+    if not course:
+        return JsonResponse({"error": "Missing course parameter"}, status=400)
 
-    uploads = QRCodeUpload.objects.filter(lecture_id__course_id=course).select_related('student_id', 'lecture_id')
-    obj = [
+    uploads = getUploadsForCourse(course)  # [] for unknown course -> 200 with []
+    data = [
         {
             "username": u.student_id.user.username,
-            "upload_time": u.uploaded_at.strftime("%Y-%m-%d %H:%M:%S"),
-            "lecture_date": u.lecture_id.lecture_date.strftime("%Y-%m-%d") if u.lecture_id else None,
-            "qr_identifier": u.qr_identifier,
+            "upload_time": u.uploaded_at.isoformat(),
         }
         for u in uploads
     ]
-    return JsonResponse(obj, safe=False)
+    return JsonResponse(data, safe=False) 
 
 
 # ---------------------------------------------------------------------------
